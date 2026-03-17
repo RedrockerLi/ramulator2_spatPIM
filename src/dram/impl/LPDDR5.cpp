@@ -111,7 +111,7 @@ class LPDDR5 : public IDRAM, public Implementation {
    ***********************************************/
     inline static constexpr ImplDef m_states = {
     //    ACT-1       ACT-2
-       "Pre-Opened", "Opened", "Closed", "PowerUp", "N/A", "Refreshing"
+       "Pre-Opened", "Opened", "Closed", "PowerUp", "N/A"
     };
 
     inline static const ImplLUT m_init_states = LUT (
@@ -176,11 +176,6 @@ class LPDDR5 : public IDRAM, public Implementation {
     bool check_rowbuffer_hit(int command, const AddrVec_t& addr_vec) override {
       int channel_id = addr_vec[m_levels["channel"]];
       return m_channels[channel_id]->check_rowbuffer_hit(command, addr_vec, m_clk);
-    };
-    
-    bool check_node_open(int command, const AddrVec_t& addr_vec) override {
-      int channel_id = addr_vec[m_levels["channel"]];
-      return m_channels[channel_id]->check_node_open(command, addr_vec, m_clk);
     };
 
   private:
@@ -434,13 +429,15 @@ class LPDDR5 : public IDRAM, public Implementation {
       m_preqs[m_levels["rank"]][m_commands["REFab"]] = Lambdas::Preq::Rank::RequireAllBanksClosed<LPDDR5>;
       m_preqs[m_levels["rank"]][m_commands["RFMab"]] = Lambdas::Preq::Rank::RequireAllBanksClosed<LPDDR5>;
 
-      m_preqs[m_levels["rank"]][m_commands["REFpb"]] = [this] (Node* node, int cmd, const AddrVec_t& addr_vec, Clk_t clk) {
+      m_preqs[m_levels["rank"]][m_commands["REFpb"]] = [this] (Node* node, int cmd, int target_id, Clk_t clk) {
+        int target_bank_id = target_id;
+        int another_target_bank_id = target_id + 8;
 
         for (auto bg : node->m_child_nodes) {
           for (auto bank : bg->m_child_nodes) {
             int num_banks_per_bg = m_organization.count[m_levels["bank"]];
             int flat_bankid = bank->m_node_id + bg->m_node_id * num_banks_per_bg;
-            if (flat_bankid == addr_vec[LPDDR5::m_levels["bank"]] || flat_bankid == addr_vec[LPDDR5::m_levels["bank"]] + 8) {
+            if (flat_bankid == target_id || flat_bankid == another_target_bank_id) {
               switch (node->m_state) {
                 case m_states["Pre-Opened"]: return m_commands["PRE"];
                 case m_states["Opened"]: return m_commands["PRE"];
@@ -455,12 +452,12 @@ class LPDDR5 : public IDRAM, public Implementation {
       m_preqs[m_levels["rank"]][m_commands["RFMpb"]] = m_preqs[m_levels["rank"]][m_commands["REFpb"]];
 
       // Bank Preqs
-      m_preqs[m_levels["bank"]][m_commands["RD16"]] = [] (Node* node, int cmd, const AddrVec_t& addr_vec, Clk_t clk) {
+      m_preqs[m_levels["bank"]][m_commands["RD16"]] = [] (Node* node, int cmd, int target_id, Clk_t clk) {
         switch (node->m_state) {
           case m_states["Closed"]: return m_commands["ACT-1"];
           case m_states["Pre-Opened"]: return m_commands["ACT-2"];
           case m_states["Opened"]: {
-            if (node->m_row_state.find(0) != node->m_row_state.end()) {
+            if (node->m_row_state.find(target_id) != node->m_row_state.end()) {
               Node* rank = node->m_parent_node->m_parent_node;
               if (rank->m_final_synced_cycle < clk) {
                 return m_commands["CASRD"];
@@ -477,12 +474,12 @@ class LPDDR5 : public IDRAM, public Implementation {
           } 
         }
       };
-      m_preqs[m_levels["bank"]][m_commands["WR16"]] = [] (Node* node, int cmd, const AddrVec_t& addr_vec, Clk_t clk) {
+      m_preqs[m_levels["bank"]][m_commands["WR16"]] = [] (Node* node, int cmd, int target_id, Clk_t clk) {
         switch (node->m_state) {
           case m_states["Closed"]: return m_commands["ACT-1"];
           case m_states["Pre-Opened"]: return m_commands["ACT-2"];
           case m_states["Opened"]: {
-            if (node->m_row_state.find(0) != node->m_row_state.end()) {
+            if (node->m_row_state.find(target_id) != node->m_row_state.end()) {
               Node* rank = node->m_parent_node->m_parent_node;
               if (rank->m_final_synced_cycle < clk) {
                 return m_commands["CASWR"];

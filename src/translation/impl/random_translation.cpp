@@ -93,6 +93,9 @@ class RandomTranslation : public ITranslation, public Implementation {
     };    
 
     bool reserve(const std::string& type, Addr_t addr) override {
+      if (type != "Hydra") {
+        throw ConfigurationError("Hydra translation only accepts address reservation for Hydra.");
+      }
       Addr_t ppn = addr >> m_offsetbits;
       // Add page to reserved pages if it is not already reserved
       m_reserved_pages.insert(ppn);

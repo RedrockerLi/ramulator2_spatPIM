@@ -14,10 +14,8 @@ Ramulator 2.0 also provides implementations for the following RowHammer mitigati
 - PARA [[Kim+, ISCA'14]](https://people.inf.ethz.ch/omutlu/pub/dram-row-hammer_isca14.pdf)
 - TWiCe [[Lee+, ISCA'19]](https://ieeexplore.ieee.org/document/8980327)
 - Graphene [[Park+, MICRO'20]](https://microarch.org/micro53/papers/738300a001.pdf)
-- BlockHammer [[Yağlıkçı+, HPCA'21]](https://people.inf.ethz.ch/omutlu/pub/BlockHammer_preventing-DRAM-rowhammer-at-low-cost_hpca21.pdf)
 - Hydra [[Qureshi+, ISCA'22]](https://memlab.ece.gatech.edu/papers/ISCA_2022_1.pdf)
 - Randomized Row Swap (RRS) [[Saileshwar+, ASPLOS'22]](https://gururaj-s.github.io/assets/pdf/ASPLOS22_Saileshwar.pdf)
-- AQUA [[Saxena+, MICRO'22]](https://memlab.ece.gatech.edu/papers/MICRO_2022_1.pdf)
 - An "Oracle" Refresh Mitigation [[Kim+, ISCA'20]](https://people.inf.ethz.ch/omutlu/pub/Revisiting-RowHammer_isca20-FINAL-DO-NOT_DISTRIBUTE.pdf)
 
 A quick glance at Ramulator 2.0's other key features:
@@ -122,7 +120,6 @@ env.Append(
 if env['HAVE_RAMULATOR2']:
   SimObject('Ramulator2.py', sim_objects=['Ramulator2'])
   Source('ramulator2.cc')
-  DebugFlag("Ramulator2")
 ```
 6. Create the Ramulator2 SimObject as the memory controller and specify the path to the Ramulator 2.0 configuration file in your gem5 configuration script, e.g.,
 ```python
@@ -308,17 +305,7 @@ cd ..
 - DRAM Organization: "DDR4_8G_X8"
 - DRAM Frequency: "DDR4_2400"
 - Number of Ranks: 2
-
-We provide the already configured Verilog files in `verilog_verification/sources/`. 
-
-4. Convert the DRAM Command Trace to fit the testbench of the Verilog model. We provide a script `verilog_verification/trace_converter.py` to do so.
-```bash
-python3 trace_converter.py DDR4_8G_X8 2 DDR4_2400
-```
-5.  Then you can just start your Verilog simulator (e.g., ModelSim) and check for violations. We provide a script to parse the simulation output and check for errors `verilog_verification/trace_verifier.py`
-```bash
-python3 trace_verifier.py <trace_filepath> <output_filepath>
-```
+4. Convert the DRAM Command Trace to fit the testbench of the Verilog model. We provide a script `verilog_verification/trace_converter.py` to do so. Then you can just start your Verilog simulator (e.g., ModelSim) and check for violations.
 
 ## Reproducing the Results in our Ramulator 2.0 paper
 ### Simulation Performance Comparison with Other Simulators
@@ -367,7 +354,7 @@ We put all scripts and configurations in `rh_study/`
 1. Get the instruction traces from SPEC 2006 and 2017
 ```bash
 cd rh_study
-wget <download_link>  # We host the traces here https://drive.google.com/file/d/1CvAenRZQmmM6s55ptG0-XyeLjhMVovTx/view?usp=drive_link
+wget <download_link>  # Please visit 
 tar xvzf ./cputraces.tar.gz
 ```
 2. Generate workloads from trace combinations
