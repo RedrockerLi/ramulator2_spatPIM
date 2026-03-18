@@ -1,0 +1,34 @@
+Frontend:
+  impl: LoadStoreTrace
+  path: ./ddr5_gqa.trace
+  clock_ratio: 1
+
+  Translation:
+    impl: NoTranslation
+    max_addr: 68719476736
+
+MemorySystem:
+  impl: GenericDRAM
+  clock_ratio: 3
+
+  DRAM:
+    impl: DDR5
+    org:
+      preset: DDR5_64Gb_x16
+      channel: 2
+      rank: 4
+    timing:
+      preset: DDR5_3200AN 
+    RFM:
+      BRC: 2
+
+  Controller:
+    impl: Generic
+    Scheduler:
+      impl: FRFCFS
+    RefreshManager:
+      impl: AllBank
+    plugins:
+
+  AddrMapper:
+    impl: RoBaRaCoCh
