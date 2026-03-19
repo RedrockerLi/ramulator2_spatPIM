@@ -180,6 +180,9 @@ def run(dhead, kv_heads, nq_heads, L, mode, output):
 
     base_addr = 0
 
+    kv_heads  = kv_heads // 4 # 4通道
+    nq_heads  = nq_heads // 4
+
     # GQA ratio
     assert nq_heads % kv_heads == 0
     gqa_ratio = nq_heads // kv_heads
