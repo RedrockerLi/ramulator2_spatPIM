@@ -164,7 +164,7 @@ def main():
                         choices=["A", "B", "C"], default="A")
 
     parser.add_argument("-o", "--output", type=str,
-                        default="ddr5_gqa.trace")
+                        default="./test.trace")
 
     args = parser.parse_args()
 
