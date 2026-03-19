@@ -1,6 +1,6 @@
 Frontend:
   impl: LoadStoreTrace
-  path: ./ddr5_gqa.trace
+  path: ./test.trace
   clock_ratio: 1
 
   Translation:
