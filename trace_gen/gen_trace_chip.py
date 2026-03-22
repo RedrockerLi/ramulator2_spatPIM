@@ -171,6 +171,36 @@ def mode_C(trace, base_addr, L, kv_heads, gqa_ratio):
 
     return addr
 
+# =========================================================
+# 模式 D：读 attention（QK结果）每个头随机分散读 0.02L
+# =========================================================
+def mode_D(trace, base_addr, L, kv_heads, gqa_ratio):
+    head_span_bytes = L * 2
+
+    num_reads_per_head = int(0.02 * L)
+    
+    if num_reads_per_head < 1:
+        num_reads_per_head = 1
+        
+    current_addr = base_addr
+
+    for h in range(kv_heads * gqa_ratio):
+        head_base = base_addr + h * head_span_bytes
+        for _ in range(num_reads_per_head):
+            max_offset = max(0, head_span_bytes - BURST_BYTES)
+        
+            random_offset = random.randint(0, max_offset)
+            
+            aligned_offset = (random_offset // BURST_BYTES) * BURST_BYTES
+            
+            read_addr = head_base + aligned_offset
+
+            trace.append(gen_ld(read_addr))
+        
+            current_addr = read_addr + BURST_BYTES
+
+    return current_addr
+
 
 # =========================================================
 # 主流程
@@ -180,8 +210,8 @@ def run(dhead, kv_heads, nq_heads, L, mode, output):
 
     base_addr = 0
 
-    kv_heads  = kv_heads // 4 # 4通道
-    nq_heads  = nq_heads // 4
+    nq_heads = nq_heads // 4
+    kv_heads = kv_heads // 4
 
     # GQA ratio
     assert nq_heads % kv_heads == 0
@@ -195,6 +225,9 @@ def run(dhead, kv_heads, nq_heads, L, mode, output):
 
     elif mode == "C":
         base_addr = mode_C(trace, base_addr, L, kv_heads, gqa_ratio)
+
+    elif mode == "D":
+        base_addr = mode_D(trace, base_addr, L, kv_heads, gqa_ratio)
 
     else:
         raise ValueError("Unknown mode")
@@ -237,7 +270,7 @@ def main():
     parser.add_argument("-l", "--seqlen", type=int, default=2048)
 
     parser.add_argument("-m", "--mode", type=str,
-                        choices=["A", "B", "C"], default="A")
+                        choices=["A", "B", "C", "D"], default="A")
 
     parser.add_argument("-o", "--output", type=str,
                         default="./test.trace")
