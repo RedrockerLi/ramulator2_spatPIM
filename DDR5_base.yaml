@@ -15,7 +15,7 @@ MemorySystem:
     impl: DDR5
     org:
       preset: DDR5_64Gb_x16
-      channel: 2
+      channel: 1
       rank: 4
     timing:
       preset: DDR5_3200AN 

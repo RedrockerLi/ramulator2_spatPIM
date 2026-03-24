@@ -5,7 +5,7 @@ import random
 # ==============================
 # DDR5 参数
 # ==============================
-BURST_BYTES = 32  # DDR5 BL16 x16
+BURST_BYTES = 64  # DDR5 Data=Bus Width×Burst Length=16×4=64B
 
 # ==============================
 # 基本命令
@@ -24,16 +24,18 @@ def burst_align(size):
 # 模式 A：读 K cache（int4）
 # =========================================================
 def mode_A(trace, base_addr, L, dhead, kv_heads):
-    total_bytes = kv_heads * L * dhead // 2  # int4
+    read_bytes = kv_heads * L * dhead // 2  # int4
 
     addr = base_addr
-    end = base_addr + total_bytes
+    end = base_addr + read_bytes
 
+    total_bytes = 0
     while addr < end:
         trace.append(gen_ld(addr))
         addr += BURST_BYTES
+        total_bytes += BURST_BYTES
 
-    return addr
+    return addr, total_bytes
 
 
 # =========================================================
@@ -49,6 +51,8 @@ def mode_B(trace, base_addr, L, dhead, kv_heads, gqa_ratio):
     k_vec_bytes = burst_align(k_vec_bytes)
 
     GROUP_SIZE = 16
+
+    total_bytes = 0
 
     # =========================================================
     # Phase 1: 生成所有 READ
@@ -81,6 +85,7 @@ def mode_B(trace, base_addr, L, dhead, kv_heads, gqa_ratio):
                     read_trace.append(gen_ld(addr))
                     addr += BURST_BYTES
                     read_bytes += BURST_BYTES
+                    total_bytes += BURST_BYTES
 
     # =========================================================
     # Phase 2: 生成所有 WRITE（带 burst 聚合）
@@ -102,6 +107,7 @@ def mode_B(trace, base_addr, L, dhead, kv_heads, gqa_ratio):
             write_trace.append(gen_st(write_addr))
             write_addr += BURST_BYTES
             write_buffer -= BURST_BYTES
+            total_bytes += BURST_BYTES
 
     # =========================================================
     # Phase 3: 穿插（核心）
@@ -154,22 +160,24 @@ def mode_B(trace, base_addr, L, dhead, kv_heads, gqa_ratio):
 
     trace.extend(final_trace)
 
-    return addr
+    return addr, total_bytes
 
 # =========================================================
 # 模式 C：读 attention（QK结果）
 # =========================================================
 def mode_C(trace, base_addr, L, kv_heads, gqa_ratio):
-    total_bytes = kv_heads * L * gqa_ratio * 2 
+    read_bytes = kv_heads * L * gqa_ratio * 2 
 
     addr = base_addr
 
-    while total_bytes > 0:
+    total_bytes = 0
+    while read_bytes > 0:
         trace.append(gen_ld(addr))
         addr += BURST_BYTES
-        total_bytes -= BURST_BYTES
+        read_bytes -= BURST_BYTES
+        total_bytes += BURST_BYTES
 
-    return addr
+    return addr, total_bytes
 
 # =========================================================
 # 模式 D：读 attention（QK结果）每个头随机分散读 0.02L
@@ -183,6 +191,8 @@ def mode_D(trace, base_addr, L, kv_heads, gqa_ratio):
         num_reads_per_head = 1
         
     current_addr = base_addr
+
+    total_bytes = 0
 
     for h in range(kv_heads * gqa_ratio):
         head_base = base_addr + h * head_span_bytes
@@ -198,8 +208,9 @@ def mode_D(trace, base_addr, L, kv_heads, gqa_ratio):
             trace.append(gen_ld(read_addr))
         
             current_addr = read_addr + BURST_BYTES
+            total_bytes += 2
 
-    return current_addr
+    return current_addr, total_bytes
 
 
 # =========================================================
@@ -218,16 +229,16 @@ def run(dhead, kv_heads, nq_heads, L, mode, output):
     gqa_ratio = nq_heads // kv_heads
 
     if mode == "A":
-        base_addr = mode_A(trace, base_addr, L, dhead, kv_heads)
+        base_addr, total_bytes = mode_A(trace, base_addr, L, dhead, kv_heads)
 
     elif mode == "B":
-        base_addr = mode_B(trace, base_addr, L, dhead, kv_heads, gqa_ratio)
+        base_addr, total_bytes = mode_B(trace, base_addr, L, dhead, kv_heads, gqa_ratio)
 
     elif mode == "C":
-        base_addr = mode_C(trace, base_addr, L, kv_heads, gqa_ratio)
+        base_addr, total_bytes = mode_C(trace, base_addr, L, kv_heads, gqa_ratio)
 
     elif mode == "D":
-        base_addr = mode_D(trace, base_addr, L, kv_heads, gqa_ratio)
+        base_addr, total_bytes = mode_D(trace, base_addr, L, kv_heads, gqa_ratio)
 
     else:
         raise ValueError("Unknown mode")
@@ -248,6 +259,7 @@ def run(dhead, kv_heads, nq_heads, L, mode, output):
     print(f"mode         : {mode}")
     print(f"Total cmds   : {len(trace)}")
     print(f"Output       : {output}")
+    print(f"Total bytes  : {total_bytes}")
 
 
 # =========================================================
