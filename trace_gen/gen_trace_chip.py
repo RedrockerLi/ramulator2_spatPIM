@@ -107,7 +107,6 @@ def mode_B(trace, base_addr, L, dhead, kv_heads, gqa_ratio):
             write_trace.append(gen_st(write_addr))
             write_addr += BURST_BYTES
             write_buffer -= BURST_BYTES
-            total_bytes += BURST_BYTES
 
     # =========================================================
     # Phase 3: 穿插（核心）
