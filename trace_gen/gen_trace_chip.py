@@ -215,13 +215,13 @@ def mode_D(trace, base_addr, L, kv_heads, gqa_ratio):
 # =========================================================
 # 主流程
 # =========================================================
-def run(dhead, kv_heads, nq_heads, L, mode, output):
+def run(dhead, kv_heads, nq_heads, L, mode, output, ddr_num):
     trace = []
 
     base_addr = 0
 
-    nq_heads = nq_heads // 4
-    kv_heads = kv_heads // 4
+    nq_heads = nq_heads // ddr_num
+    kv_heads = max(1, kv_heads // ddr_num)
 
     # GQA ratio
     assert nq_heads % kv_heads == 0
@@ -285,6 +285,14 @@ def main():
 
     parser.add_argument("-o", "--output", type=str,
                         default="./test.trace")
+    
+    parser.add_argument(
+        "--ddr-num",
+        type=int,
+        default=4,
+        help=
+        "number of DDR, default = 4"
+    )
 
     args = parser.parse_args()
 
@@ -294,7 +302,8 @@ def main():
         nq_heads=args.q_heads,
         L=args.seqlen,
         mode=args.mode,
-        output=args.output
+        output=args.output,
+        ddr_num=args.ddr_num
     )
 
 
