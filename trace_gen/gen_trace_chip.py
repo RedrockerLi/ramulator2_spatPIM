@@ -305,8 +305,13 @@ def run(dhead, kv_heads, nq_heads, L, mode, output, ddr_num):
 
     base_addr = 0
 
+    # print("ddr_num:",ddr_num)
+    # print("nq_heads:",nq_heads)
+    # print("kv_heads:",kv_heads)
     nq_heads = nq_heads // ddr_num
     kv_heads = max(1, kv_heads // ddr_num)
+    # print("nq_heads:",nq_heads)
+    # print("kv_heads:",kv_heads)
 
     # GQA ratio
     assert nq_heads % kv_heads == 0
@@ -326,6 +331,10 @@ def run(dhead, kv_heads, nq_heads, L, mode, output, ddr_num):
 
     else:
         raise ValueError("Unknown mode")
+    
+    total_bytes = total_bytes * max(1, (nq_heads/kv_heads) / 8)
+    
+    # print("total_bytes:",total_bytes)
 
     # 写文件
     with open(output, "w") as f:
