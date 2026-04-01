@@ -20,20 +20,105 @@ def burst_align(size):
     return math.ceil(size / BURST_BYTES) * BURST_BYTES
 
 
-# =========================================================
-# 模式 A：读 K cache（int4）
-# =========================================================
 def mode_A(trace, base_addr, L, dhead, kv_heads):
-    read_bytes = kv_heads * L * dhead // 2  # int4
 
     addr = base_addr
-    end = base_addr + read_bytes
+
+    # ---------------------------
+    # K 大小（int4）
+    # ---------------------------
+    k_vec_bytes = dhead // 2
+    k_vec_bytes = burst_align(k_vec_bytes)
+
+    GROUP_SIZE = 16
 
     total_bytes = 0
-    while addr < end:
-        trace.append(gen_ld(addr))
-        addr += BURST_BYTES
-        total_bytes += BURST_BYTES
+
+    # =========================================================
+    # Phase 1: 生成所有 READ（全量读取）
+    # =========================================================
+    read_trace = []
+
+    total_K = kv_heads * L
+
+    for _ in range(total_K):
+
+        read_bytes = 0
+        while read_bytes < k_vec_bytes:
+            read_trace.append(gen_ld(addr))
+            addr += BURST_BYTES
+            read_bytes += BURST_BYTES
+            total_bytes += BURST_BYTES
+
+    # =========================================================
+    # Phase 2: 生成 WRITE（每16个K → 1个bf16）
+    # =========================================================
+    write_trace = []
+
+    write_addr = 1 << 30
+    write_buffer = 0
+
+    num_results = total_K // GROUP_SIZE  # 每16个K一个结果
+
+    for _ in range(num_results):
+
+        result_bytes = 2  # bf16
+        write_buffer += result_bytes
+
+        while write_buffer >= BURST_BYTES:
+            write_trace.append(gen_st(write_addr))
+            write_addr += BURST_BYTES
+            write_buffer -= BURST_BYTES
+
+    # =========================================================
+    # Phase 3: READ / WRITE 穿插（仿 mode_B）
+    # =========================================================
+    gap = int(28 + (dhead / 16) * 4)*(BURST_BYTES/2)
+
+    r_ptr = 0
+    w_ptr = 0
+
+    final_trace = []
+
+    reads_per_k = k_vec_bytes // BURST_BYTES
+    total_reads = len(read_trace)
+
+    k_counter = 0  # 用于控制每16个K触发一次write机会
+
+    while r_ptr < total_reads:
+
+        # ---------------------------
+        # 1. 发一个 K 的 read
+        # ---------------------------
+        for _ in range(reads_per_k):
+            if r_ptr < total_reads:
+                final_trace.append(read_trace[r_ptr])
+                r_ptr += 1
+
+        k_counter += 1
+
+        # ---------------------------
+        # 2. gap（用 read 流自然填充）
+        # ---------------------------
+        for _ in range(gap):
+            if r_ptr < total_reads:
+                final_trace.append(read_trace[r_ptr])
+                r_ptr += 1
+
+        # ---------------------------
+        # 3. 每16个K尝试发一个 write
+        # ---------------------------
+        if k_counter % GROUP_SIZE == 0:
+            if w_ptr < len(write_trace):
+                final_trace.append(write_trace[w_ptr])
+                w_ptr += 1
+
+    # 剩余 write 补齐
+    while w_ptr < len(write_trace):
+        final_trace.append(write_trace[w_ptr])
+        w_ptr += 1
+
+    trace.extend(final_trace)
 
     return addr, total_bytes
 
@@ -112,7 +197,7 @@ def mode_B(trace, base_addr, L, dhead, kv_heads, gqa_ratio):
     # Phase 3: 穿插（核心）
     # =========================================================
     # 每读一个 K 后，间隔 gap 插入 write（如果有）
-    gap = int(27 + (dhead / 16) * 4)
+    gap = int(29 + (dhead / 16) * 4)*(BURST_BYTES/2)
 
     r_ptr = 0
     w_ptr = 0
