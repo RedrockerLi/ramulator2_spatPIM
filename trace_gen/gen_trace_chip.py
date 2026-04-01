@@ -73,7 +73,7 @@ def mode_A(trace, base_addr, L, dhead, kv_heads):
     # =========================================================
     # Phase 3: READ / WRITE 穿插（仿 mode_B）
     # =========================================================
-    gap = int(28 + (dhead / 16) * 4)*(BURST_BYTES/2)
+    gap = int((28 + (dhead / 16) * 4)*(BURST_BYTES/2))
 
     r_ptr = 0
     w_ptr = 0
@@ -197,7 +197,7 @@ def mode_B(trace, base_addr, L, dhead, kv_heads, gqa_ratio):
     # Phase 3: 穿插（核心）
     # =========================================================
     # 每读一个 K 后，间隔 gap 插入 write（如果有）
-    gap = int(29 + (dhead / 16) * 4)*(BURST_BYTES/2)
+    gap = int((29 + (dhead / 16) * 4)*(BURST_BYTES/2))
 
     r_ptr = 0
     w_ptr = 0
